@@ -79,13 +79,12 @@
         <div class="modal-content">
             <form id="createTaskForm">
                 <div class="modal-header">
-                    <h5 class="modal-title">Create New Task</h5>
+                    <h5 class="modal-title text-dark">Buat agenda baru!</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     @csrf
                     <div class="mb-3">
-                        <label for="taskKeterangan">Keterangan Task</label>
                         <textarea class="form-control" name="keterangan_task" id="taskKeterangan" rows="2" required></textarea>
                     </div>
                 </div>
@@ -104,14 +103,13 @@
         <div class="modal-content">
             <form id="moveToForm">
                 <div class="modal-header">
-                    <h5 class="modal-title">Move Task To</h5>
+                    <h5 class="modal-title text-dark">Pindah Agenda</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     @csrf
                     <input type="hidden" id="moveTaskId" name="task_id">
                     <div class="mb-3">
-                        <label for="moveDate" class="form-label">Tanggal Pindah</label>
                         <input type="date" class="form-control" id="moveDate" name="move_date" required>
                     </div>
                 </div>
