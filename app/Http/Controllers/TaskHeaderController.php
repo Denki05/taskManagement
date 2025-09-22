@@ -7,20 +7,22 @@ use Illuminate\Http\Request;
 
 class TaskHeaderController extends Controller
 {
-    public function index(Request $request)
+   public function index(Request $request)
     {
-        // jika request AJAX dengan parameter date
+        // Jika permintaan AJAX dengan parameter date
         if ($request->ajax()) {
             $date = $request->get('date');
 
             $query = TaskHeader::with(['tasks' => function ($q) {
-                $q->orderByDesc('is_favorite')
+                // 🔥 Tambahkan kondisi ini untuk hanya mengambil task yang aktif (status = 1)
+                $q->where('status', \App\Models\TaskList::STATUS['ACTIVE'])
+                ->orderByDesc('is_favorite')
                 ->orderByRaw('favorite_rank IS NULL')
                 ->orderBy('favorite_rank', 'asc');
             }]);
 
             if ($date) {
-                $query->whereDate('created_at', $date); // atau pakai field task_date kalau ada
+                $query->whereDate('tanggal', $date);
             }
 
             $taskHeaders = $query->get();
@@ -31,9 +33,11 @@ class TaskHeaderController extends Controller
             ]);
         }
 
-        // default load view
+        // Default load view
         $data['taskHeaders'] = TaskHeader::with(['tasks' => function ($q) {
-            $q->orderByDesc('is_favorite')
+            // 🔥 Tambahkan kondisi ini untuk hanya mengambil task yang aktif (status = 1)
+            $q->where('status', \App\Models\TaskList::STATUS['ACTIVE'])
+            ->orderByDesc('is_favorite')
             ->orderByRaw('favorite_rank IS NULL')
             ->orderBy('favorite_rank', 'asc');
         }])->get();

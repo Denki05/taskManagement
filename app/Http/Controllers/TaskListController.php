@@ -23,14 +23,14 @@ class TaskListController extends Controller
                     'pic' => "Erick",
                 ],
                 [
-                    'status' => 'active',
+                    'status' => 1,
                 ]
             );
 
             TaskList::create([
                 'task_header_id' => $header->id,
                 'keterangan_task' => $request->keterangan_task,
-                'status' => 'active',
+                'status' => 1,
             ]);
 
             return response()->json(['success' => true]);
@@ -43,48 +43,93 @@ class TaskListController extends Controller
         }
     }
 
-    public function update(Request $request, TaskList $taskList)
+    public function hideTask(TaskList $taskList)
     {
-        $taskList->update($request->all());
-        return back()->with('success', 'Task berhasil diupdate');
-    }
+        $taskList->update(['status' => TaskList::STATUS['HIDE']]);
+        
+        if (request()->ajax()) {
+            return response()->json(['success' => 'Task hidden successfully.']);
+        }
 
-    public function destroy(TaskList $taskList)
-    {
-        $taskList->update(['status' => 'hide']);
         return back()->with('success', 'Task disembunyikan');
     }
 
-    // Tambahan fitur
-
     public function move(Request $request, TaskList $taskList)
     {
-        // simpan tanggal tujuan di field move_to_date
-        $taskList->update(['move_to_date' => $request->agenda_date]);
-
-        // cari atau buat header baru
-        $header = TaskHeader::firstOrCreate([
-            'tanggal' => $request->agenda_date,
-            'pic' => $taskList->header->pic,
-        ], [
-            'status' => 'active',
+        // 1. Validasi request
+        $request->validate([
+            'move_date' => 'required|date',
         ]);
 
-        // buat task baru di tanggal tujuan
-        TaskList::create([
-            'task_header_id' => $header->id,
-            'keterangan_task' => $taskList->keterangan_task,
-            'ref_cust' => $taskList->ref_cust,
-            'status' => 'active',
+        $tanggalTujuan = $request->input('move_date');
+
+        // 2. Pastikan task memiliki header sebelum melanjutkan
+        if (!$taskList->header) {
+            return response()->json(['success' => false, 'message' => 'Task header tidak ditemukan.'], 404);
+        }
+
+        // 3. Cari atau buat TaskHeader baru untuk tanggal tujuan
+        $taskHeaderTujuan = TaskHeader::firstOrCreate(
+            ['tanggal' => $tanggalTujuan, 'pic' => $taskList->header->pic],
+            ['status' => 'active']
+        );
+
+        // 4. Perbarui task lama dengan task_header_id yang baru.
+        //    Ini hanya memindahkan satu entri di database.
+        $taskList->update([
+            'task_header_id' => $taskHeaderTujuan->id,
+            'status' => TaskList::STATUS['ACTIVE'],
         ]);
 
-        return back()->with('success', 'Task berhasil dipindah');
+        return response()->json(['success' => true, 'message' => 'Task berhasil dipindah.']);
     }
 
     public function favorite(TaskList $taskList)
     {
-        $taskList->update(['is_favorite' => !$taskList->is_favorite]);
-        return back()->with('success', 'Task diupdate sebagai favorit');
+        DB::beginTransaction();
+
+        try {
+            if ($taskList->is_favorite) {
+                // Jika sudah favorit, hapus favoritnya
+                $oldRank = $taskList->favorite_rank;
+                $taskList->update([
+                    'is_favorite' => false,
+                    'favorite_rank' => null,
+                ]);
+
+                // Geser rank dari semua favorit di bawahnya ke atas
+                TaskList::where('is_favorite', true)
+                    ->where('favorite_rank', '>', $oldRank)
+                    ->decrement('favorite_rank');
+            } else {
+                // Jika belum favorit, jadikan favorit dan beri rank 1
+                $newRank = 1;
+
+                // Geser semua favorit yang ada ke bawah
+                TaskList::where('is_favorite', true)
+                    ->increment('favorite_rank');
+
+                // Update task yang baru saja difavoritkan
+                $taskList->update([
+                    'is_favorite' => true,
+                    'favorite_rank' => $newRank,
+                ]);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Task berhasil diupdate sebagai favorit.',
+                'is_favorite' => !$taskList->is_favorite,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengubah status favorit: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     public function toggleFavorite(TaskList $task)

@@ -2,7 +2,6 @@
 
 @section('content')
 <div class="bg-dark p-3 rounded">
-    <!-- Header Navigation -->
     <div class="d-flex justify-content-between align-items-center mb-3">
         <button id="prevDate" class="btn btn-outline-light btn-sm">&lt;</button>
         <div class="text-center">
@@ -20,12 +19,10 @@
                 data-bs-toggle="modal" data-bs-target="#createTaskModal">
                 <i class="bi bi-plus-lg"></i>
             </button>
-            <!-- 🔥 input date hidden -->
             <input type="date" id="datePicker" class="d-none">
         </div>
     </div>
 
-    <!-- Task List -->
     <div id="taskContainer">
         <ul id="taskList" class="list-unstyled">
             @foreach($taskHeaders as $header)
@@ -52,18 +49,18 @@
                                 <ul class="dropdown-menu dropdown-menu-end">
                                     <li>
                                         <a class="dropdown-item toggle-favorite" href="#" data-id="{{ $task->id }}">
-                                            <i class="bi bi-star{{ $task->favorite_rank ? '-fill text-warning' : '' }}"></i>
+                                            <i class="bi bi-star{{ $task->is_favorite ? '-fill text-warning' : '' }}"></i>
                                             Favorite
                                         </a>
                                     </li>
                                     <li><hr class="dropdown-divider"></li>
                                     <li>
-                                        <a class="dropdown-item move-to" href="#" data-id="{{ $header->id }}">
+                                        <a class="dropdown-item move-to" href="#" data-id="{{ $task->id }}">
                                             <i class="bi bi-calendar-plus"></i> Move To
                                         </a>
                                     </li>
                                     <li>
-                                        <a class="dropdown-item text-danger delete-task" href="#" data-id="{{ $header->id }}">
+                                        <a class="dropdown-item text-danger delete-task" href="#" data-id="{{ $task->id }}">
                                             <i class="bi bi-trash"></i> Delete
                                         </a>
                                     </li>
@@ -77,56 +74,54 @@
     </div>
 </div>
 
-<!-- Modal Create Task -->
 <div class="modal fade" id="createTaskModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <form id="createTaskForm">
-        <div class="modal-header">
-          <h5 class="modal-title">Create New Task</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="createTaskForm">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create New Task</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    @csrf
+                    <div class="mb-3">
+                        <label for="taskKeterangan">Keterangan Task</label>
+                        <textarea class="form-control" name="keterangan_task" id="taskKeterangan" rows="2" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                </div>
+            </form>
         </div>
-        <div class="modal-body">
-          @csrf
-          <div class="mb-3">
-            <label for="taskKeterangan">Keterangan Task</label>
-            <textarea class="form-control" name="keterangan_task" id="taskKeterangan" rows="2" required></textarea>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary btn-sm">Save</button>
-        </div>
-      </form>
     </div>
-  </div>
 </div>
 
 
-<!-- Modal Move To -->
 <div class="modal fade" id="moveToModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <form id="moveToForm">
-        <div class="modal-header">
-          <h5 class="modal-title">Move Task To</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="moveToForm">
+                <div class="modal-header">
+                    <h5 class="modal-title">Move Task To</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    @csrf
+                    <input type="hidden" id="moveTaskId" name="task_id">
+                    <div class="mb-3">
+                        <label for="moveDate" class="form-label">Tanggal Pindah</label>
+                        <input type="date" class="form-control" id="moveDate" name="move_date" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Move</button>
+                </div>
+            </form>
         </div>
-        <div class="modal-body">
-          @csrf
-          <input type="hidden" id="moveTaskId" name="task_id">
-          <div class="mb-3">
-            <label for="moveDate" class="form-label">Tanggal Pindah</label>
-            <input type="date" class="form-control" id="moveDate" name="move_date" required>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary btn-sm">Move</button>
-        </div>
-      </form>
     </div>
-  </div>
 </div>
 @endsection
 
@@ -185,51 +180,93 @@ document.addEventListener('DOMContentLoaded', function () {
     // ke dalam fungsi untuk memastikan event-event ini terpasang kembali setiap kali 
     // konten di update.
     function reattachEventListeners() {
+        // Toggle Favorite
         document.querySelectorAll('.toggle-favorite').forEach(btn => {
-            btn.addEventListener('click', function(e) {
+            btn.addEventListener('click', async function(e) {
                 e.preventDefault();
-                let id = this.dataset.id;
-                fetch(`/task-lists/${id}/favorite`, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                        'Accept': 'application/json'
+                const taskId = this.dataset.id;
+                const icon = this.querySelector('i');
+
+                if (!taskId || !icon) return;
+
+                try {
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                    
+                    const res = await fetch(`/task-lists/${taskId}/favorite`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json'
+                        }
+                    });
+
+                    const data = await res.json();
+
+                    if (data.success) {
+                        if (data.is_favorite) {
+                            icon.classList.remove('bi-star');
+                            icon.classList.add('bi-star-fill', 'text-warning');
+                        } else {
+                            icon.classList.remove('bi-star-fill', 'text-warning');
+                            icon.classList.add('bi-star');
+                        }
+                    } else {
+                        console.error('Toggle favorite failed:', data.message);
+                        alert('Gagal mengubah status favorit.');
                     }
-                }).then(() => updateDateDisplay());
+
+                } catch (err) {
+                    console.error('Fetch error:', err);
+                    alert('Terjadi kesalahan saat menghubungi server.');
+                }
             });
         });
 
-        document.querySelectorAll('.delete-task').forEach(btn => {
-            btn.addEventListener('click', function(e) {
-                e.preventDefault();
-                if (!confirm("Are you sure to delete this task?")) return;
-                let id = this.dataset.id;
-                fetch(`/task-headers/${id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                        'Accept': 'application/json'
-                    }
-                }).then(() => updateDateDisplay());
-            });
-        });
-
+        // Move To
         document.querySelectorAll('.move-to').forEach(btn => {
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
-                document.getElementById('moveTaskId').value = this.dataset.id;
+                const taskId = this.dataset.id;
+                document.getElementById('moveTaskId').value = taskId;
                 const moveToModal = new bootstrap.Modal(document.getElementById('moveToModal'));
                 moveToModal.show();
             });
         });
 
+        // Delete
+        document.querySelectorAll('.delete-task').forEach(btn => {
+            btn.addEventListener('click', async function(e) {
+                e.preventDefault();
+                if (!confirm("Apakah kamu yakin menghapus agenda ini?")) return;
+
+                const taskId = this.dataset.id;
+                const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+                try {
+                    await fetch(`/task-lists/${taskId}/hide`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json'
+                        }
+                    });
+                    updateDateDisplay();
+                } catch (err) {
+                    console.error('Delete error:', err);
+                    alert('Terjadi kesalahan saat menghapus task.');
+                }
+            });
+        });
+
+        // Read More
         document.querySelectorAll('.read-more').forEach(btn => {
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
-                let container = this.closest('.task-text');
+                const container = this.closest('.task-text');
                 if (!container) return;
-                let shortText = container.querySelector('.short-text');
-                let fullText = container.querySelector('.full-text');
+
+                const shortText = container.querySelector('.short-text');
+                const fullText = container.querySelector('.full-text');
                 if (shortText && fullText) {
                     fullText.classList.toggle('d-none');
                     shortText.classList.toggle('d-none');
@@ -238,6 +275,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
     }
+
     
     // 🔥 Modifikasi fungsi updateDateDisplay()
     const today = new Date();
@@ -282,7 +320,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 let html = `<ul id="taskList" class="list-unstyled">`;
                 data.taskHeaders.forEach(header => {
                     header.tasks.forEach((task, i) => {
-                        const favoriteClass = task.favorite_rank ? 'bi-star-fill text-warning' : 'bi-star';
+                        // 🔥 Perbaikan di sini: Gunakan is_favorite
+                        const favoriteClass = task.is_favorite ? 'bi-star-fill text-warning' : 'bi-star';
                         const showMore = task.keterangan_task.length > 50;
                         const shortText = showMore ? task.keterangan_task.substring(0, 50) : task.keterangan_task;
                         const fullTextHtml = showMore ? `<span class="full-text d-none">${task.keterangan_task}</span><a href="#" class="read-more small text-primary">Lihat selengkapnya</a>` : '';
