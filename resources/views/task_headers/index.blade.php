@@ -135,18 +135,16 @@ document.addEventListener('DOMContentLoaded', function () {
         new Sortable(document.getElementById('taskList'), {
             animation: 150,
             onEnd: function () {
+                // ambil urutan terbaru
                 let order = [];
                 document.querySelectorAll('#taskList li[data-id]').forEach((el, index) => {
-                    const id = el.dataset.id;
-                    if (!id) return;
                     order.push({
-                        id: id,
+                        id: el.dataset.id,
                         rank: index + 1
                     });
                 });
 
-                if (order.length === 0) return;
-
+                // kirim ke backend
                 fetch('/task-lists/reorder', {
                     method: 'POST',
                     headers: {
@@ -158,11 +156,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
+                        // update nomor urut di UI
                         document.querySelectorAll('#taskList li[data-id]').forEach((el, index) => {
                             let numberEl = el.querySelector('.fw-bold');
                             if (numberEl) {
                                 let textNode = numberEl.childNodes[0];
-                                if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+                                if (textNode.nodeType === Node.TEXT_NODE) {
                                     textNode.nodeValue = (index + 1) + '. ';
                                 }
                             }
@@ -170,8 +169,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     } else {
                         console.error('Reorder failed', data);
                     }
-                })
-                .catch(err => console.error('Reorder error', err));
+                }).catch(err => console.error(err));
             }
         });
     }
@@ -182,44 +180,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function reattachEventListeners() {
         // Toggle Favorite
         document.querySelectorAll('.toggle-favorite').forEach(btn => {
-            btn.addEventListener('click', async function(e) {
-                e.preventDefault();
-                const taskId = this.dataset.id;
-                const icon = this.querySelector('i');
-
-                if (!taskId || !icon) return;
-
-                try {
-                    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-                    
-                    const res = await fetch(`/task-lists/${taskId}/favorite`, {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN': csrfToken,
-                            'Accept': 'application/json'
-                        }
-                    });
-
-                    const data = await res.json();
-
-                    if (data.success) {
-                        if (data.is_favorite) {
-                            icon.classList.remove('bi-star');
-                            icon.classList.add('bi-star-fill', 'text-warning');
-                        } else {
-                            icon.classList.remove('bi-star-fill', 'text-warning');
-                            icon.classList.add('bi-star');
-                        }
-                    } else {
-                        console.error('Toggle favorite failed:', data.message);
-                        alert('Gagal mengubah status favorit.');
-                    }
-
-                } catch (err) {
-                    console.error('Fetch error:', err);
-                    alert('Terjadi kesalahan saat menghubungi server.');
-                }
-            });
+            btn.removeEventListener('click', toggleFavoriteHandler);
+            btn.addEventListener('click', toggleFavoriteHandler);
         });
 
         // Move To
@@ -276,7 +238,68 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    
+    async function toggleFavoriteHandler(e) {
+        e.preventDefault();
+
+        const taskId = this.dataset.id;
+        const icon = this.querySelector('i');
+        if (!taskId || !icon) return;
+
+        try {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+            const res = await fetch(`/task-lists/${taskId}/favorite`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json'
+                }
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                // 🔹 Update ikon favorit
+                if (data.is_favorite) {
+                    icon.classList.remove('bi-star');
+                    icon.classList.add('bi-star-fill', 'text-warning');
+                } else {
+                    icon.classList.remove('bi-star-fill', 'text-warning');
+                    icon.classList.add('bi-star');
+                }
+
+                // 🔹 Reorder task list sesuai favorite_rank
+                const ul = document.getElementById('taskList');
+                if (data.favorites && data.favorites.length) {
+                    // letakkan favorit terbaru di atas
+                    data.favorites.slice().reverse().forEach(fav => {
+                        const li = ul.querySelector(`li[data-id="${fav.id}"]`);
+                        if (li) ul.insertBefore(li, ul.firstChild);
+                    });
+                }
+
+                // 🔹 Update nomor urut di UI
+                ul.querySelectorAll('li[data-id]').forEach((el, index) => {
+                    const numberEl = el.querySelector('.fw-bold');
+                    if (numberEl && numberEl.childNodes[0].nodeType === Node.TEXT_NODE) {
+                        numberEl.childNodes[0].nodeValue = (index + 1) + '. ';
+                    }
+                });
+
+                // 🔹 Update dataset agar tetap sinkron
+                this.dataset.isFavorite = data.is_favorite ? 1 : 0;
+
+            } else {
+                console.error('Toggle favorite failed:', data.message);
+                alert('Gagal mengubah status favorit.');
+            }
+
+        } catch (err) {
+            console.error(err);
+            alert('Terjadi kesalahan saat menghubungi server.');
+        }
+    }
+   
     // 🔥 Modifikasi fungsi updateDateDisplay()
     const today = new Date();
     let activeDate = new Date(today);

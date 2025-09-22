@@ -87,41 +87,38 @@ class TaskListController extends Controller
     public function favorite(TaskList $taskList)
     {
         DB::beginTransaction();
-
         try {
             if ($taskList->is_favorite) {
-                // Jika sudah favorit, hapus favoritnya
                 $oldRank = $taskList->favorite_rank;
                 $taskList->update([
                     'is_favorite' => false,
                     'favorite_rank' => null,
                 ]);
-
-                // Geser rank dari semua favorit di bawahnya ke atas
                 TaskList::where('is_favorite', true)
                     ->where('favorite_rank', '>', $oldRank)
                     ->decrement('favorite_rank');
             } else {
-                // Jika belum favorit, jadikan favorit dan beri rank 1
-                $newRank = 1;
-
-                // Geser semua favorit yang ada ke bawah
-                TaskList::where('is_favorite', true)
-                    ->increment('favorite_rank');
-
-                // Update task yang baru saja difavoritkan
+                TaskList::where('is_favorite', true)->increment('favorite_rank');
                 $taskList->update([
                     'is_favorite' => true,
-                    'favorite_rank' => $newRank,
+                    'favorite_rank' => 1,
                 ]);
             }
+
+            // Ambil task favorit terbaru urut
+            $favorites = TaskList::where('is_favorite', true)
+                ->orderBy('favorite_rank')
+                ->get(['id', 'favorite_rank']);
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Task berhasil diupdate sebagai favorit.',
-                'is_favorite' => !$taskList->is_favorite,
+                'task_id' => $taskList->id,
+                'is_favorite' => $taskList->is_favorite,
+                'favorite_rank' => $taskList->favorite_rank,
+                'favorites' => $favorites,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
