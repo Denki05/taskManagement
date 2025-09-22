@@ -399,21 +399,58 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Tambahkan event listener untuk form yang perlu diinisialisasi sekali saja
-    document.getElementById('moveToForm').addEventListener('submit', function (e) {
+    document.getElementById('moveToForm').addEventListener('submit', async function (e) {
         e.preventDefault();
-        let id = document.getElementById('moveTaskId').value;
-        let date = document.getElementById('moveDate').value;
-        fetch(`/task-headers/${id}/move`, {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ move_date: date })
-        }).then(() => {
-            moveToModal.hide();
-            updateDateDisplay();
-        });
+        let taskId = document.getElementById('moveTaskId').value;
+        let moveDate = document.getElementById('moveDate').value;
+
+        try {
+            const res = await fetch(`/task-lists/${taskId}/move`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ move_date: moveDate })
+            });
+
+            const data = await res.json();
+            if (!data.success) {
+                alert(data.message || 'Gagal memindahkan task');
+                return;
+            }
+
+            // 🔹 Ambil modal Bootstrap yang sudah ada
+            const moveToModalEl = document.getElementById('moveToModal');
+            const moveToModalInstance = bootstrap.Modal.getInstance(moveToModalEl);
+            if (moveToModalInstance) {
+                moveToModalInstance.hide(); // Tutup modal
+            }
+
+            // 🔹 Update DOM
+            const li = document.querySelector(`#taskList li[data-id="${taskId}"]`);
+            if (li) li.remove();
+
+            const targetDateStr = new Date(moveDate).toISOString().split('T')[0];
+            const activeDateStr = activeDate.toISOString().split('T')[0];
+
+            if (targetDateStr === activeDateStr) {
+                const ul = document.getElementById('taskList');
+                ul.appendChild(li);
+            }
+
+            // 🔹 Update nomor urut
+            document.querySelectorAll('#taskList li[data-id]').forEach((el, index) => {
+                const numberEl = el.querySelector('.fw-bold');
+                if (numberEl && numberEl.childNodes[0].nodeType === Node.TEXT_NODE) {
+                    numberEl.childNodes[0].nodeValue = (index + 1) + '. ';
+                }
+            });
+
+        } catch (err) {
+            console.error(err);
+            alert('Terjadi kesalahan saat memindahkan task');
+        }
     });
 
     const createTaskForm = document.getElementById('createTaskForm');
