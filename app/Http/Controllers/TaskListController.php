@@ -16,26 +16,38 @@ class TaskListController extends Controller
             $request->validate([
                 'keterangan_task' => 'required|string',
             ]);
-
+    
+            // Ambil user yang sedang aktif dari session
+            $userPic = $request->session()->get('user_link');
+    
+            if (!$userPic) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User tidak dikenali.'
+                ], 403);
+            }
+    
+            // Cari atau buat TaskHeader sesuai tanggal hari ini dan user aktif
             $header = TaskHeader::firstOrCreate(
                 [
                     'tanggal' => \Carbon\Carbon::today(),
-                    'pic' => "Erick",
+                    'pic' => $userPic,
                 ],
                 [
                     'status' => 1,
                 ]
             );
-
+    
+            // Buat task baru di bawah header yang sesuai
             TaskList::create([
                 'task_header_id' => $header->id,
                 'keterangan_task' => $request->keterangan_task,
                 'status' => 1,
             ]);
-
+    
             return response()->json(['success' => true]);
+    
         } catch (\Exception $e) {
-            dd($e);
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage()
@@ -65,7 +77,7 @@ class TaskListController extends Controller
 
         // 2. Pastikan task memiliki header sebelum melanjutkan
         if (!$taskList->header) {
-            return response()->json(['success' => false, 'message' => 'Task header tidak ditemukan.'], 404);
+            return response()->json(['success' => false, 'message' => 'Agenda tidak ditemukan.'], 404);
         }
 
         // 3. Cari atau buat TaskHeader baru untuk tanggal tujuan
