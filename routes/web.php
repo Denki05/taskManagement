@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
+use App\Http\Controllers\TaskHeaderController;
+use App\Http\Controllers\TaskListController;
 
 // Halaman root langsung redirect ke task-headers
 Route::get('/', function () {
@@ -19,6 +21,9 @@ Route::post('task-lists/{taskList}/favorite', 'TaskListController@favorite')->na
 Route::post('task-lists/reorder', 'TaskListController@reorder')->name('task-lists.reorder');
 Route::post('task-lists/{taskList}/hide', 'TaskListController@hideTask')->name('task-lists.hide');
 Route::post('task-lists', 'TaskListController@store')->name('task-lists.store');
+Route::post('task-lists/{taskList}/done', 'TaskListController@markDone')->name('task-lists.done');
+Route::post('/task-headers/move-all', [TaskHeaderController::class, 'moveAll'])->name('task-headers.moveAll');
+Route::post('/tasks/sync', 'TaskListController@sync')->name('tasks.sync');
 
 Route::get('/s/{userLink}', 'AccessController@handleUserLink')->name('user.link');
 

@@ -18,7 +18,7 @@
         body {
             background-color: #ffffffff;
             color: #fff;
-            font-size: 14px; /* lebih kecil agar pas di HP */
+            font-size: 12px; /* lebih kecil agar pas di HP */
         }
         .container {
             max-width: 480px; /* seperti layar mobile */

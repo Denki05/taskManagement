@@ -141,14 +141,6 @@ class TaskListController extends Controller
         }
     }
 
-    public function toggleFavorite(TaskList $task)
-    {
-        $task->favorite_rank = $task->favorite_rank ? null : 1; // contoh toggle sederhana
-        $task->save();
-
-        return response()->json(['success' => true]);
-    }
-
     public function moveTo(Request $request, TaskHeader $header)
     {
         $request->validate([
@@ -209,6 +201,107 @@ class TaskListController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    public function markDone(TaskList $taskList)
+    {
+        try {
+            $taskList->update(['status' => TaskList::STATUS['DONE']]);
+    
+            return response()->json([
+                'success' => true,
+                'task_id' => $taskList->id,
+                'status' => $taskList->status
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengubah status task: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    public function sync(Request $request)
+    {
+        try {
+            // Pastikan user terautentikasi
+            $userPic = $request->session()->get('user_link');
+            if (!$userPic) {
+                return response()->json(['success' => false, 'message' => 'User tidak dikenali.'], 403);
+            }
+
+            $changes = $request->input('changes', []);
+            DB::beginTransaction();
+
+            foreach ($changes as $change) {
+                switch ($change['action']) {
+                    case 'favorite':
+                        $taskList = TaskList::find($change['id']);
+                        if ($taskList) {
+                            $taskList->update(['is_favorite' => $change['is_favorite']]);
+                        }
+                        break;
+                    case 'done':
+                        $taskList = TaskList::find($change['id']);
+                        if ($taskList) {
+                            $taskList->update(['status' => 2]);
+                        }
+                        break;
+                    case 'hide':
+                        $taskList = TaskList::find($change['id']);
+                        if ($taskList) {
+                            $taskList->update(['status' => 3]);
+                        }
+                        break;
+                    case 'move':
+                        $taskList = TaskList::find($change['id']);
+                        if ($taskList) {
+                            $targetDate = $change['move_date'];
+                            $targetHeader = TaskHeader::firstOrCreate(
+                                ['tanggal' => $targetDate, 'pic' => $userPic],
+                                ['status' => 1]
+                            );
+                            $taskList->update(['task_header_id' => $targetHeader->id]);
+                        }
+                        break;
+                    case 'reorder':
+                        foreach ($change['order'] as $item) {
+                            $taskList = TaskList::find($item['id']);
+                            if ($taskList) {
+                                $taskList->update(['rank' => $item['rank']]);
+                            }
+                        }
+                        break;
+                    case 'moveAll':
+                        // Pindahkan semua task dari satu tanggal ke tanggal lain
+                        $sourceHeader = TaskHeader::where('tanggal', $change['source_date'])
+                            ->where('pic', $userPic)
+                            ->first();
+
+                        if ($sourceHeader) {
+                            $targetHeader = TaskHeader::firstOrCreate(
+                                ['tanggal' => $change['target_date'], 'pic' => $userPic],
+                                ['status' => 1]
+                            );
+                            // Pindahkan semua task dari header sumber ke header target
+                            TaskList::where('task_header_id', $sourceHeader->id)
+                                ->update(['task_header_id' => $targetHeader->id]);
+
+                            $sourceHeader->delete(); // Hapus header lama
+                        }
+                        break;
+                }
+            }
+
+            DB::commit();
+            return response()->json(['success' => true, 'message' => 'Perubahan berhasil disinkronkan.']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menyinkronkan perubahan: ' . $e->getMessage()
             ], 500);
         }
     }

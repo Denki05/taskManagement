@@ -1,85 +1,94 @@
 @extends('layouts.app')
 
 @section('content')
+<style>
+    .task-text .full-text {
+        display: block;
+        margin-top: 5px;
+        white-space: normal;
+        word-wrap: break-word;
+        overflow-wrap: anywhere;
+    }
+    
+    .task-item.task-done .p-3 {
+        background-color: #d4edda !important; /* Warna hijau muda */
+        border: 1px solid #c3e6cb;
+    }
+
+    .task-item.task-done .task-text,
+    .task-item.task-done .fw-bold,
+    .task-item.task-done .text-muted {
+        color: #6c757d !important; /* Ubah warna teks menjadi abu-abu */
+    }
+
+    .task-item.task-done .toggle-favorite,
+    .task-item.task-done .move-to,
+    .task-item.task-done .delete-task {
+        opacity: 0.5;
+        pointer-events: none; /* Nonaktifkan klik */
+    }
+</style>
+
+<div class="modal fade" id="syncAlertModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title text-dark">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> Perubahan Tertunda
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-dark">
+                Ada perubahan yang belum disinkronkan. Silakan sinkronkan sekarang untuk menyimpan data Anda.
+                <br><small class="text-muted" id="pending-count-modal"></small>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Nanti Saja</button>
+                <button type="button" class="btn btn-warning btn-sm" id="syncBtnModal">Sinkronkan Sekarang</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="bg-dark p-3 rounded">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <button id="prevDate" class="btn btn-outline-light btn-sm">&lt;</button>
-        <div class="text-center">
-            <h5 id="dateTitle" class="mb-0">Today</h5>
-            <small id="dateText" class="text-secondary">
-                {{ \Carbon\Carbon::now()->format('d M Y') }}
-            </small>
+        <div class="d-flex align-items-center">
+            <button class="btn btn-outline-light btn-sm me-2">
+                <i class="bi bi-grid-3x3-gap"></i>
+            </button>
+            <button id="prevDate" class="btn btn-outline-light btn-sm">&lt;</button>
         </div>
+    
+        <div class="text-center d-flex justify-content-center align-items-center">
+            <span id="dateTitle" class="fw-semibold"></span>
+        </div>
+    
         <div class="d-flex align-items-center">
             <button id="nextDate" class="btn btn-outline-light btn-sm me-2">&gt;</button>
             <button id="calendarBtn" class="btn btn-outline-light btn-sm me-2">
                 <i class="bi bi-calendar-event"></i>
             </button>
-            <button class="btn btn-outline-light btn-sm me-2" 
-                data-bs-toggle="modal" data-bs-target="#createTaskModal">
-                <i class="bi bi-plus-lg"></i>
+            <button id="moveAllBtn" class="btn btn-outline-light btn-sm me-2" 
+                data-bs-toggle="modal" data-bs-target="#moveAllModal">
+                <i class="bi bi-arrow-return-right"></i>
             </button>
             <input type="date" id="datePicker" class="d-none">
         </div>
     </div>
 
     <div id="taskContainer">
-        <ul id="taskList" class="list-unstyled">
-            @foreach($taskHeaders as $header)
-                @foreach ($header->tasks as $task)
-                    <li class="mb-3" data-id="{{ $task->id }}">
-                        <div class="p-3 bg-white rounded shadow-sm d-flex justify-content-between align-items-start text-dark"
-                            data-id="{{ $header->id }}">
-                            <div class="flex-grow-1">
-                                <div class="fw-bold task-text">
-                                    {{ $loop->iteration }}.
-                                    <span class="short-text">
-                                        {{ \Illuminate\Support\Str::limit($task->keterangan_task, 50, '') }}
-                                    </span>
-                                    @if(strlen($task->keterangan_task) > 50)
-                                        <span class="full-text d-none">{{ $task->keterangan_task }}</span>
-                                        <a href="#" class="read-more small text-primary">Lihat selengkapnya</a>
-                                    @endif
-                                </div>
-                            </div>
-                            <div class="dropdown ms-2">
-                                <a href="#" class="text-dark" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    <i class="bi bi-three-dots-vertical fs-5"></i>
-                                </a>
-                                <ul class="dropdown-menu dropdown-menu-end">
-                                    <li>
-                                        <a class="dropdown-item toggle-favorite" href="#" data-id="{{ $task->id }}">
-                                            <i class="bi bi-star{{ $task->is_favorite ? '-fill text-warning' : '' }}"></i>
-                                            Favorite
-                                        </a>
-                                    </li>
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li>
-                                        <a class="dropdown-item move-to" href="#" data-id="{{ $task->id }}">
-                                            <i class="bi bi-calendar-plus"></i> Move To
-                                        </a>
-                                    </li>
-                                    <li>
-                                        <a class="dropdown-item text-danger delete-task" href="#" data-id="{{ $task->id }}">
-                                            <i class="bi bi-trash"></i> Delete
-                                        </a>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-                    </li>
-                @endforeach
-            @endforeach
-        </ul>
-    </div>
+        </div>
 </div>
 
 <div class="modal fade" id="createTaskModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <form id="createTaskForm">
-                <div class="modal-header">
-                    <h5 class="modal-title text-dark">Buat agenda baru!</h5>
+                <div class="modal-header d-flex justify-content-between align-items-center">
+                    <h5 class="modal-title text-dark">
+                        Buat agenda baru!
+                        <small class="text-muted d-block fs-6" id="modalTaskDate"></small>
+                    </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -96,7 +105,6 @@
         </div>
     </div>
 </div>
-
 
 <div class="modal fade" id="moveToModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -121,6 +129,31 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="moveAllModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="moveAllForm">
+                <div class="modal-header">
+                    <h5 class="modal-title text-dark">Pindahkan Semua Agenda</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    @csrf
+                    <p id="moveAllConfirmationText"></p>
+                    <div class="mb-3">
+                        <label for="moveAllDate" class="form-label">Pilih Tanggal Tujuan:</label>
+                        <input type="date" class="form-control" id="moveAllDate" name="move_all_date" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Pindahkan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 @endsection
 
 @section('scripts')
@@ -128,365 +161,460 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // 🔥 Pindahkan inisialisasi SortableJS ke dalam fungsi
-    function initSortable() {
-        new Sortable(document.getElementById('taskList'), {
-            animation: 150,
-            onEnd: function () {
-                // ambil urutan terbaru
-                let order = [];
-                document.querySelectorAll('#taskList li[data-id]').forEach((el, index) => {
-                    order.push({
-                        id: el.dataset.id,
-                        rank: index + 1
-                    });
-                });
-
-                // kirim ke backend
-                fetch('/task-lists/reorder', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ order: order })
-                })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        // update nomor urut di UI
-                        document.querySelectorAll('#taskList li[data-id]').forEach((el, index) => {
-                            let numberEl = el.querySelector('.fw-bold');
-                            if (numberEl) {
-                                let textNode = numberEl.childNodes[0];
-                                if (textNode.nodeType === Node.TEXT_NODE) {
-                                    textNode.nodeValue = (index + 1) + '. ';
-                                }
-                            }
-                        });
-                    } else {
-                        console.error('Reorder failed', data);
-                    }
-                }).catch(err => console.error(err));
-            }
-        });
-    }
-
-    // 🔥 Pindahkan semua event listener (termasuk .toggle-favorite, .delete-task, dll.)
-    // ke dalam fungsi untuk memastikan event-event ini terpasang kembali setiap kali 
-    // konten di update.
-    function reattachEventListeners() {
-        // Toggle Favorite
-        document.querySelectorAll('.toggle-favorite').forEach(btn => {
-            btn.removeEventListener('click', toggleFavoriteHandler);
-            btn.addEventListener('click', toggleFavoriteHandler);
-        });
-
-        // Move To
-        document.querySelectorAll('.move-to').forEach(btn => {
-            btn.addEventListener('click', function(e) {
-                e.preventDefault();
-                const taskId = this.dataset.id;
-                document.getElementById('moveTaskId').value = taskId;
-                const moveToModal = new bootstrap.Modal(document.getElementById('moveToModal'));
-                moveToModal.show();
-            });
-        });
-
-        // Delete
-        document.querySelectorAll('.delete-task').forEach(btn => {
-            btn.addEventListener('click', async function(e) {
-                e.preventDefault();
-                if (!confirm("Apakah kamu yakin menghapus agenda ini?")) return;
-
-                const taskId = this.dataset.id;
-                const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
-                try {
-                    await fetch(`/task-lists/${taskId}/hide`, {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN': csrfToken,
-                            'Accept': 'application/json'
-                        }
-                    });
-                    updateDateDisplay();
-                } catch (err) {
-                    console.error('Delete error:', err);
-                    alert('Terjadi kesalahan saat menghapus task.');
-                }
-            });
-        });
-
-        // Read More
-        document.querySelectorAll('.read-more').forEach(btn => {
-            btn.addEventListener('click', function(e) {
-                e.preventDefault();
-                const container = this.closest('.task-text');
-                if (!container) return;
-
-                const shortText = container.querySelector('.short-text');
-                const fullText = container.querySelector('.full-text');
-                if (shortText && fullText) {
-                    fullText.classList.toggle('d-none');
-                    shortText.classList.toggle('d-none');
-                    this.textContent = fullText.classList.contains('d-none') ? 'Lihat selengkapnya' : 'Tutup';
-                }
-            });
-        });
-    }
-
-    async function toggleFavoriteHandler(e) {
-        e.preventDefault();
-
-        const taskId = this.dataset.id;
-        const icon = this.querySelector('i');
-        if (!taskId || !icon) return;
-
-        try {
-            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
-            const res = await fetch(`/task-lists/${taskId}/favorite`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': csrfToken,
-                    'Accept': 'application/json'
-                }
-            });
-
-            const data = await res.json();
-
-            if (data.success) {
-                // 🔹 Update ikon favorit
-                if (data.is_favorite) {
-                    icon.classList.remove('bi-star');
-                    icon.classList.add('bi-star-fill', 'text-warning');
-                } else {
-                    icon.classList.remove('bi-star-fill', 'text-warning');
-                    icon.classList.add('bi-star');
-                }
-
-                // 🔹 Reorder task list sesuai favorite_rank
-                const ul = document.getElementById('taskList');
-                if (data.favorites && data.favorites.length) {
-                    // letakkan favorit terbaru di atas
-                    data.favorites.slice().reverse().forEach(fav => {
-                        const li = ul.querySelector(`li[data-id="${fav.id}"]`);
-                        if (li) ul.insertBefore(li, ul.firstChild);
-                    });
-                }
-
-                // 🔹 Update nomor urut di UI
-                ul.querySelectorAll('li[data-id]').forEach((el, index) => {
-                    const numberEl = el.querySelector('.fw-bold');
-                    if (numberEl && numberEl.childNodes[0].nodeType === Node.TEXT_NODE) {
-                        numberEl.childNodes[0].nodeValue = (index + 1) + '. ';
-                    }
-                });
-
-                // 🔹 Update dataset agar tetap sinkron
-                this.dataset.isFavorite = data.is_favorite ? 1 : 0;
-
-            } else {
-                console.error('Toggle favorite failed:', data.message);
-                alert('Gagal mengubah status favorit.');
-            }
-
-        } catch (err) {
-            console.error(err);
-            alert('Terjadi kesalahan saat menghubungi server.');
-        }
-    }
-   
-    // 🔥 Modifikasi fungsi updateDateDisplay()
+    const SYNC_INTERVAL = 30000; // 30 detik
+    let syncTimer = null;
+    let syncDelayTimer = null;
+    let activeDate = new Date();
     const today = new Date();
-    let activeDate = new Date(today);
     const dateTitle = document.getElementById("dateTitle");
-    const dateText = document.getElementById("dateText");
     const prevBtn = document.getElementById("prevDate");
     const nextBtn = document.getElementById("nextDate");
     const calendarBtn = document.getElementById("calendarBtn");
     const datePicker = document.getElementById("datePicker");
     const taskContainer = document.getElementById("taskContainer");
-    const moveToModal = new bootstrap.Modal(document.getElementById('moveToModal'));
+    
+    // Inisialisasi modal secara global
+    const syncAlertModalEl = document.getElementById('syncAlertModal');
+    const syncAlertModal = new bootstrap.Modal(syncAlertModalEl);
+    const createTaskModalEl = document.getElementById('createTaskModal');
+    const createTaskModal = new bootstrap.Modal(createTaskModalEl);
+    const moveToModalEl = document.getElementById('moveToModal');
+    const moveToModal = new bootstrap.Modal(moveToModalEl);
+    const moveAllModalEl = document.getElementById('moveAllModal');
+    const moveAllModal = new bootstrap.Modal(moveAllModalEl);
 
-    function updateDateDisplay() {
-        const options = { day: '2-digit', month: 'short', year: 'numeric' };
-        dateText.textContent = activeDate.toLocaleDateString("en-US", options);
+    // --- Fungsi Bantuan untuk Logika Sinkronisasi ---
 
-        if (
-            activeDate.getFullYear() === today.getFullYear() &&
-            activeDate.getMonth() === today.getMonth() &&
-            activeDate.getDate() === today.getDate()
-        ) {
-            dateTitle.textContent = "Today";
+    function updateSyncNotification(showModalImmediately = false) {
+        const pendingChanges = JSON.parse(localStorage.getItem('pending_task_changes') || '[]');
+        const modalBody = syncAlertModalEl.querySelector('.modal-body');
+
+        if (pendingChanges.length > 0) {
+            modalBody.innerHTML = `Ada ${pendingChanges.length} perubahan yang belum disinkronkan. Silakan sinkronkan sekarang untuk menyimpan data Anda.`;
+            
+            // Tampilkan modal jika kondisi terpenuhi
+            if (showModalImmediately) {
+                syncAlertModal.show();
+            }
+
+            // Atur interval untuk menampilkan modal setiap 30 detik
+            if (!syncTimer) {
+                syncTimer = setInterval(() => {
+                    if (pendingChanges.length > 0) {
+                        syncAlertModal.show();
+                    } else {
+                        clearInterval(syncTimer);
+                        syncTimer = null;
+                    }
+                }, SYNC_INTERVAL);
+            }
         } else {
-            dateTitle.textContent = activeDate.toLocaleDateString("en-US", { weekday: 'long' });
+            // Sembunyikan modal dan hapus timer jika tidak ada perubahan
+            syncAlertModal.hide();
+            if (syncTimer) {
+                clearInterval(syncTimer);
+                syncTimer = null;
+            }
+        }
+    }
+    
+    // Event listener untuk tombol 'Nanti Saja' pada modal
+    syncAlertModalEl.addEventListener('hide.bs.modal', function () {
+        // Ketika modal ditutup, timer tetap berjalan
+    });
+
+    function addChangeToQueue(change) {
+        let pendingChanges = JSON.parse(localStorage.getItem('pending_task_changes') || '[]');
+        pendingChanges.push(change);
+        localStorage.setItem('pending_task_changes', JSON.stringify(pendingChanges));
+        
+        // Reset timer dan atur ulang untuk memunculkan notifikasi setelah 30 detik
+        if (syncDelayTimer) {
+            clearTimeout(syncDelayTimer);
+        }
+        syncDelayTimer = setTimeout(() => {
+            updateSyncNotification(true);
+        }, SYNC_INTERVAL);
+        
+        // Perbarui UI secara instan dengan perubahan
+        updateDateDisplay();
+    }
+
+    async function syncChanges() {
+        const pendingChanges = JSON.parse(localStorage.getItem('pending_task_changes') || '[]');
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+        if (pendingChanges.length === 0) {
+            alert('Tidak ada perubahan untuk disinkronkan.');
+            return;
         }
 
-        const dateStr = activeDate.toISOString().split('T')[0];
+        try {
+            const res = await fetch('{{ route('tasks.sync') }}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ changes: pendingChanges })
+            });
+            const data = await res.json();
 
+            if (data.success) {
+                alert(data.message);
+                localStorage.removeItem('pending_task_changes');
+                if (syncTimer) {
+                    clearInterval(syncTimer);
+                    syncTimer = null;
+                }
+                if (syncDelayTimer) {
+                    clearTimeout(syncDelayTimer);
+                    syncDelayTimer = null;
+                }
+                syncAlertModal.hide();
+                // Muat ulang tampilan setelah sinkronisasi berhasil
+                updateDateDisplay(); 
+            } else {
+                alert(data.message || 'Gagal menyinkronkan perubahan.');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Terjadi kesalahan jaringan. Silakan coba lagi.');
+        }
+    }
+
+    // Event listener untuk tombol sinkronisasi di modal
+    document.getElementById('syncBtnModal').addEventListener('click', syncChanges);
+
+    // --- Fungsi Baru: Menerapkan perubahan lokal ke data yang diambil dari server ---
+    function applyPendingChangesToUI(taskHeaders, dateStr) {
+        const pendingChanges = JSON.parse(localStorage.getItem('pending_task_changes') || '[]');
+        let modifiedTasks = taskHeaders.flatMap(header => header.tasks);
+
+        // Filter dan hapus item yang di-hide atau di-move
+        modifiedTasks = modifiedTasks.filter(task => {
+            const hideChange = pendingChanges.find(c => c.action === 'hide' && c.id == task.id);
+            const moveChange = pendingChanges.find(c => c.action === 'move' && c.id == task.id && c.source_date === dateStr);
+            return !hideChange && !moveChange;
+        });
+
+        // Terapkan perubahan lain (done, favorite)
+        modifiedTasks.forEach(task => {
+            const doneChange = pendingChanges.find(c => c.action === 'done' && c.id == task.id);
+            if (doneChange) {
+                task.status = 2;
+            }
+            const favoriteChange = pendingChanges.find(c => c.action === 'favorite' && c.id == task.id);
+            if (favoriteChange) {
+                task.is_favorite = favoriteChange.is_favorite;
+            }
+        });
+        
+        // Terapkan reorder
+        const reorderChange = pendingChanges.find(c => c.action === 'reorder');
+        if (reorderChange) {
+            // Urutkan ulang berdasarkan urutan lokal
+            const newOrder = reorderChange.order;
+            modifiedTasks.sort((a, b) => {
+                const rankA = newOrder.find(item => item.id == a.id)?.rank || 9999;
+                const rankB = newOrder.find(item => item.id == b.id)?.rank || 9999;
+                return rankA - rankB;
+            });
+        }
+        
+        // Periksa moveAll
+        const moveAllChange = pendingChanges.find(c => c.action === 'moveAll' && c.source_date === dateStr);
+        if (moveAllChange) {
+            return []; // Kosongkan tampilan jika moveAll dilakukan untuk tanggal ini
+        }
+
+        return modifiedTasks;
+    }
+
+    // --- Event Delegation pada taskContainer ---
+    taskContainer.addEventListener('click', function (e) {
+        // Toggle Favorite
+        if (e.target.closest('.toggle-favorite')) {
+            e.preventDefault();
+            const btn = e.target.closest('.toggle-favorite');
+            const taskId = btn.dataset.id;
+            const isFavorite = btn.dataset.isFavorite === '1';
+            const newIsFavorite = !isFavorite;
+
+            // Tambahkan perubahan ke antrian
+            addChangeToQueue({
+                action: 'favorite',
+                id: taskId,
+                is_favorite: newIsFavorite
+            });
+        }
+
+        // Mark Done
+        if (e.target.closest('.complete-task')) {
+            e.preventDefault();
+            const btn = e.target.closest('.complete-task');
+            const taskId = btn.dataset.id;
+            
+            // Tambahkan perubahan ke antrian
+            addChangeToQueue({
+                action: 'done',
+                id: taskId,
+                status: 2
+            });
+        }
+
+        // Delete
+        if (e.target.closest('.delete-task')) {
+            e.preventDefault();
+            const btn = e.target.closest('.delete-task');
+            const taskId = btn.dataset.id;
+            
+            if (confirm("Apakah kamu yakin menghapus agenda ini?")) {
+                // Tambahkan perubahan ke antrian
+                addChangeToQueue({
+                    action: 'hide',
+                    id: taskId
+                });
+            }
+        }
+        
+        // Move To
+        if (e.target.closest('.move-to')) {
+            e.preventDefault();
+            const taskId = e.target.closest('.move-to').dataset.id;
+            document.getElementById('moveTaskId').value = taskId;
+            moveToModal.show();
+        }
+
+        // Read More
+        if (e.target.closest('.read-more')) {
+            e.preventDefault();
+            const container = e.target.closest('.task-text');
+            if (!container) return;
+
+            const shortText = container.querySelector('.short-text');
+            const fullText = container.querySelector('.full-text');
+            const btn = e.target.closest('.read-more');
+
+            fullText.classList.toggle('d-none');
+            shortText.classList.toggle('d-none');
+            btn.textContent = fullText.classList.contains('d-none') ? 'selengkapnya..' : 'Tutup';
+        }
+
+        // Handle Add Task button click
+        if (e.target.closest('#addTaskBtn')) {
+            updateModalTaskDate();
+            document.getElementById("taskKeterangan").value = "";
+            createTaskModal.show();
+        }
+    });
+
+    // --- Fungsi Utilitas yang Diubah untuk Optimistic UI ---
+    function initSortable() {
+        const taskListEl = document.getElementById('taskList');
+        if (!taskListEl) return;
+        
+        new Sortable(taskListEl, {
+            animation: 150,
+            handle: '.drag-handle',
+            onEnd: function () {
+                let order = [];
+                taskListEl.querySelectorAll('li[data-id]').forEach((el, index) => {
+                    const taskId = el.dataset.id;
+                    const rank = index + 1;
+                    
+                    // Update UI nomor urut secara instan
+                    const numberEl = el.querySelector('.fw-bold');
+                    if (numberEl && numberEl.childNodes[0].nodeType === Node.TEXT_NODE) {
+                        numberEl.childNodes[0].nodeValue = `${rank}. `;
+                    }
+
+                    order.push({ id: taskId, rank: rank });
+                });
+                
+                // Tambahkan perubahan reorder ke antrian
+                addChangeToQueue({
+                    action: 'reorder',
+                    order: order
+                });
+            }
+        });
+    }
+    
+    // --- Fungsi Utama untuk Mengelola UI dan Data ---
+    function updateDateDisplay() {
+        const optionsDate = { day: '2-digit', month: 'short' };
+        const optionsWeekday = { weekday: 'long' };
+        let titleText = "";
+        
+        if (activeDate.getFullYear() === today.getFullYear() && activeDate.getMonth() === today.getMonth() && activeDate.getDate() === today.getDate()) {
+            titleText = "Today, " + activeDate.toLocaleDateString("en-US", optionsDate);
+        } else {
+            titleText = activeDate.toLocaleDateString("en-US", optionsWeekday) + ", " + activeDate.toLocaleDateString("en-US", optionsDate);
+        }
+        dateTitle.textContent = titleText;
+        const dateStr = activeDate.toISOString().split("T")[0];
+
+        // Fetch data dari server
         fetch(`/task-headers?date=${dateStr}`, {
             headers: { 'X-Requested-With': 'XMLHttpRequest' }
         })
         .then(res => res.json())
         .then(data => {
             const container = document.getElementById("taskContainer");
-            if (!data.success || data.taskHeaders.length === 0) {
-                container.innerHTML = `
-                    <div class="card bg-light text-center p-4">
-                        <div class="text-muted">Belum ada agenda</div>
-                    </div>`;
-            } else {
-                let html = `<ul id="taskList" class="list-unstyled">`;
-                data.taskHeaders.forEach(header => {
-                    header.tasks.forEach((task, i) => {
-                        // 🔥 Perbaikan di sini: Gunakan is_favorite
-                        const favoriteClass = task.is_favorite ? 'bi-star-fill text-warning' : 'bi-star';
-                        const showMore = task.keterangan_task.length > 50;
-                        const shortText = showMore ? task.keterangan_task.substring(0, 50) : task.keterangan_task;
-                        const fullTextHtml = showMore ? `<span class="full-text d-none">${task.keterangan_task}</span><a href="#" class="read-more small text-primary">Lihat selengkapnya</a>` : '';
+            let html = "";
+            
+            // Panggil fungsi baru untuk memproses data
+            const modifiedTasks = applyPendingChangesToUI(data.taskHeaders, dateStr);
 
-                        html += `
-                            <li class="mb-3" data-id="${task.id}">
-                                <div class="p-3 bg-white rounded shadow-sm d-flex justify-content-between align-items-start text-dark">
-                                    <div class="flex-grow-1">
-                                        <div class="fw-bold task-text">
-                                            ${i + 1}.
-                                            <span class="short-text">${shortText}</span>
-                                            ${fullTextHtml}
-                                        </div>
-                                    </div>
-                                    <div class="dropdown ms-2">
-                                        <a href="#" class="text-muted" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                            <i class="bi bi-three-dots-vertical fs-5"></i>
-                                        </a>
-                                        <ul class="dropdown-menu dropdown-menu-end">
-                                            <li>
-                                                <a class="dropdown-item toggle-favorite" href="#" data-id="${task.id}">
-                                                    <i class="bi ${favoriteClass}"></i> Favorite
-                                                </a>
-                                            </li>
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li>
-                                                <a class="dropdown-item move-to" href="#" data-id="${task.id}">
-                                                    <i class="bi bi-calendar-plus"></i> Move To
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <a class="dropdown-item text-danger delete-task" href="#" data-id="${task.id}">
-                                                    <i class="bi bi-trash"></i> Delete
-                                                </a>
-                                            </li>
-                                        </ul>
+            html += `<div class="mb-3">
+                <button id="addTaskBtn" class="btn w-100 btn-light text-primary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#createTaskModal">
+                    TAMBAH AGENDA
+                </button>
+            </div>`;
+            
+            // Logic yang diperbarui untuk menampilkan pesan jika tidak ada agenda
+            if (modifiedTasks.length > 0) {
+                html += `<ul id="taskList" class="list-unstyled">`;
+                let index = 1;
+                modifiedTasks.forEach(task => {
+                    const isLong = task.keterangan_task && task.keterangan_task.length > 50;
+                    const shortText = isLong ? task.keterangan_task.substring(0, 50) + '...' : (task.keterangan_task || '');
+                    const isDone = task.status == 2;
+
+                    html += `
+                        <li class="mb-3 task-item ${isDone ? 'task-done' : ''}" data-id="${task.id}" data-is-favorite="${task.is_favorite ? '1' : '0'}">
+                            <div class="p-3 bg-white rounded shadow-sm d-flex justify-content-between align-items-center text-dark"
+                                data-task-id="${task.id}">
+                                
+                                <div class="d-flex flex-column align-items-center me-3">
+                                    <a href="#" class="toggle-favorite text-dark mb-2" data-id="${task.id}" data-is-favorite="${task.is_favorite ? '1' : '0'}">
+                                        <i class="${task.is_favorite ? 'bi bi-star-fill text-warning' : 'bi bi-star'}"></i>
+                                    </a>
+                                    <span class="fw-bold">${index}. </span>
+                                    <a href="#" class="delete-task text-dark mt-2" data-id="${task.id}">
+                                        <i class="bi bi-x-lg"></i>
+                                    </a>
+                                </div>
+                                
+                                <div class="flex-grow-1 text-center px-2">
+                                    <div class="fw-bold task-text">
+                                        <span class="short-text ${isLong ? '' : 'd-none'}">${shortText}</span>
+                                        <span class="full-text ${isLong ? 'd-none' : ''}">${task.keterangan_task}</span>
+                                        ${ isLong ? `<a href="#" class="read-more small text-primary">selengkapnya..</a>` : '' }
                                     </div>
                                 </div>
-                            </li>
-                        `;
-                    });
+                                
+                                <div class="d-flex flex-column align-items-center ms-3">
+                                    ${!isDone ? `<a href="#" class="text-success mb-2 complete-task" data-id="${task.id}"><i class="bi bi-check-lg"></i></a>` : ''}
+                                    <a href="#" class="move-to text-dark mb-2" data-id="${task.id}">
+                                        <i class="bi bi-box-arrow-up-right"></i>
+                                    </a>
+                                    
+                                    <div class="drag-handle" title="Drag untuk urutkan">
+                                        <i class="bi bi-three-dots-vertical fs-5 text-muted"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                    `;
+                    index++;
                 });
                 html += `</ul>`;
-                container.innerHTML = html;
-
-                // 🔥 Panggil kembali inisialisasi Sortable dan event listeners
-                initSortable();
-                reattachEventListeners();
+            } else {
+                html += `<div class="card bg-light text-center p-4"><div class="text-muted">Belum ada agenda</div></div>`;
             }
+            container.innerHTML = html;
+            initSortable();
         })
         .catch(err => {
             console.error("Load tasks failed:", err);
         });
+        updateModalTaskDate();
     }
+    
+    // --- Modifikasi Form dan Modal untuk Menggunakan Pending Update ---
 
-    // Tambahkan event listener untuk form yang perlu diinisialisasi sekali saja
-    document.getElementById('moveToForm').addEventListener('submit', async function (e) {
+    document.getElementById('createTaskForm').addEventListener('submit', async function (e) {
         e.preventDefault();
-        let taskId = document.getElementById('moveTaskId').value;
-        let moveDate = document.getElementById('moveDate').value;
+        const keterangan = document.getElementById('taskKeterangan').value;
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const dateStr = activeDate.toISOString().split("T")[0];
 
         try {
-            const res = await fetch(`/task-lists/${taskId}/move`, {
+            const res = await fetch('{{ route('task-lists.store') }}', {
                 method: 'POST',
                 headers: {
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                    'Content-Type': 'application/json'
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
                 },
-                body: JSON.stringify({ move_date: moveDate })
+                body: JSON.stringify({
+                    keterangan_task: keterangan,
+                    date: dateStr 
+                })
             });
 
             const data = await res.json();
-            if (!data.success) {
-                alert(data.message || 'Gagal memindahkan task');
-                return;
-            }
-
-            // 🔹 Ambil modal Bootstrap yang sudah ada
-            const moveToModalEl = document.getElementById('moveToModal');
-            const moveToModalInstance = bootstrap.Modal.getInstance(moveToModalEl);
-            if (moveToModalInstance) {
-                moveToModalInstance.hide(); // Tutup modal
-            }
-
-            // 🔹 Update DOM
-            const li = document.querySelector(`#taskList li[data-id="${taskId}"]`);
-            if (li) li.remove();
-
-            const targetDateStr = new Date(moveDate).toISOString().split('T')[0];
-            const activeDateStr = activeDate.toISOString().split('T')[0];
-
-            if (targetDateStr === activeDateStr) {
-                const ul = document.getElementById('taskList');
-                ul.appendChild(li);
-            }
-
-            // 🔹 Update nomor urut
-            document.querySelectorAll('#taskList li[data-id]').forEach((el, index) => {
-                const numberEl = el.querySelector('.fw-bold');
-                if (numberEl && numberEl.childNodes[0].nodeType === Node.TEXT_NODE) {
-                    numberEl.childNodes[0].nodeValue = (index + 1) + '. ';
-                }
-            });
-
-        } catch (err) {
-            console.error(err);
-            alert('Terjadi kesalahan saat memindahkan task');
-        }
-    });
-
-    const createTaskForm = document.getElementById('createTaskForm');
-    const createTaskModalEl = document.getElementById('createTaskModal');
-    const createTaskModal = new bootstrap.Modal(createTaskModalEl);
-
-    createTaskForm.addEventListener('submit', function (e) {
-        e.preventDefault();
-        let formData = {
-            keterangan_task: document.getElementById('taskKeterangan').value,
-        };
-        fetch('/task-lists', {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(formData)
-        })
-        .then(res => res.json())
-        .then(data => {
             if (data.success) {
-                createTaskModal.hide();
-                createTaskForm.reset();
+                // Berhasil, muat ulang tampilan
                 updateDateDisplay();
             } else {
-                alert('Gagal menambahkan task!');
+                alert(data.message || 'Gagal menyimpan agenda.');
             }
-        })
-        .catch(err => {
-            console.error(err);
-            alert('Terjadi kesalahan server!');
-        });
+        } catch (err) {
+            console.error('Save task failed:', err);
+            alert('Terjadi kesalahan jaringan atau server. Silakan coba lagi.');
+        }
+
+        document.getElementById('taskKeterangan').value = '';
+        createTaskModal.hide();
     });
 
-    // Event listener untuk tombol navigasi dan kalender
+    document.getElementById('moveToForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        let taskId = document.getElementById('moveTaskId').value;
+        let moveDate = document.getElementById('moveDate').value;
+        
+        // Tambahkan aksi ke antrian
+        addChangeToQueue({
+            action: 'move',
+            id: taskId,
+            move_date: moveDate,
+            source_date: activeDate.toISOString().split("T")[0]
+        });
+        
+        moveToModal.hide();
+    });
+
+    document.getElementById('moveAllForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        
+        let sourceDate = activeDate.toISOString().split("T")[0];
+        let targetDate = document.getElementById('moveAllDate').value;
+        
+        if (!targetDate) {
+            alert('Silakan pilih tanggal tujuan.');
+            return;
+        }
+        if (sourceDate === targetDate) {
+            alert('Tanggal tujuan tidak boleh sama dengan tanggal saat ini.');
+            return;
+        }
+        
+        // Tambahkan aksi ke antrian
+        addChangeToQueue({
+            action: 'moveAll',
+            source_date: sourceDate,
+            target_date: targetDate
+        });
+
+        moveAllModal.hide();
+    });
+
+    // --- Inisialisasi Event Listener Navigasi ---
+    
     prevBtn.addEventListener("click", () => {
         activeDate.setDate(activeDate.getDate() - 1);
         updateDateDisplay();
@@ -511,8 +639,17 @@ document.addEventListener('DOMContentLoaded', function () {
         updateDateDisplay();
     });
 
-    // Inisialisasi tampilan awal
+    // --- Fungsi Bantuan Modal ---
+
+    function updateModalTaskDate() {
+        const options = { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' };
+        const formatted = activeDate.toLocaleDateString("id-ID", options);
+        document.getElementById("modalTaskDate").textContent = formatted;
+    }
+    
+    // --- Inisialisasi Awal ---
     updateDateDisplay();
+    updateSyncNotification();
 });
 </script>
 @endsection
